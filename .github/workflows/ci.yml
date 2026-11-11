@@ -14,6 +14,6 @@ jobs:
       - name: Fetch piece assets
         run: sh scripts/fetch-pieces.sh
       - name: Test
-        run: cargo test --locked
+        run: cargo test
       - name: Build
-        run: cargo build --release --locked
+        run: cargo build --release
