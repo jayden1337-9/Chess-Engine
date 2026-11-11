@@ -222,7 +222,8 @@ impl eframe::App for ChessApp {
                 ui.horizontal(|ui| {
                     ui.label("Play as White");
                     ui.checkbox(&mut self.engine_enabled, "Engine");
-                    ui.add(egui::Slider::new(&mut self.depth, 1..=6).text("Depth"));
+                    ui.add(egui::Slider::new(&mut self.depth, 1..=6).text("AI strength"));
+                    ui.label(match self.depth { 1 => "Beginner", 2 => "Easy", 3 => "Medium", 4 => "Hard", 5 => "Expert", _ => "Phoenix" });
                 });
                 ui.add_space(8.0);
                 self.draw_board(ui);
