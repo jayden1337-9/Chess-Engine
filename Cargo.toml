@@ -28,6 +28,14 @@ strip = true
 
 [package.metadata.android]
 package = "dev.jayden.phoenixchess"
-label = "Phoenix Chess"
+build_targets = ["aarch64-linux-android"]
+
+[package.metadata.android.sdk]
 min_sdk_version = 23
 target_sdk_version = 35
+
+[package.metadata.android.application]
+label = "Phoenix Chess"
+
+[package.metadata.android.application.activity]
+name = "android.app.NativeActivity"
