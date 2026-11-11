@@ -82,7 +82,9 @@ impl ChessApp {
             BoardStatus::Checkmate => "Checkmate".to_owned(),
             BoardStatus::Stalemate => "Draw by stalemate".to_owned(),
             BoardStatus::Ongoing if self.board.checkers().popcnt() > 0 => "Check".to_owned(),
-            BoardStatus::Ongoing => "Your move".to_owned(),
+            BoardStatus::Ongoing if self.engine_enabled => "Your move".to_owned(),
+            BoardStatus::Ongoing if self.board.side_to_move() == Color::White => "White to move".to_owned(),
+            BoardStatus::Ongoing => "Black to move".to_owned(),
         };
         if self.engine_enabled && self.board.status() == BoardStatus::Ongoing && self.board.side_to_move() == Color::Black {
             self.status = "Phoenix is thinking...".to_owned();
@@ -117,7 +119,8 @@ impl ChessApp {
                 return;
             }
         }
-        if self.board.color_on(square) == Some(Color::White) {
+        let selectable = if self.engine_enabled { Color::White } else { self.board.side_to_move() };
+        if self.board.color_on(square) == Some(selectable) {
             self.selected = Some(square);
         } else {
             self.selected = None;
