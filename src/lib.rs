@@ -134,3 +134,23 @@ mod tests {
         assert!(parse_uci_move(&board, "e2e5").is_none());
     }
 }
+
+mod app;
+pub use app::ChessApp;
+
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub extern "C" fn android_main(app: winit::platform::android::activity::AndroidApp) {
+    android_logger::init_once(
+        android_logger::Config::default().with_max_level(log::LevelFilter::Info),
+    );
+    let options = eframe::NativeOptions {
+        android_app: Some(app),
+        ..Default::default()
+    };
+    let _ = eframe::run_native(
+        "Phoenix Chess",
+        options,
+        Box::new(|cc| Ok(Box::new(ChessApp::new(cc)))),
+    );
+}
