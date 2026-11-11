@@ -7,7 +7,10 @@ A Rust chess engine and Android chess app, with a Windows build planned after An
 - Rust engine core
 - Legal move generation through the `chess` crate
 - Material and piece-activity evaluation
-- Alpha-beta search
+- Iterative-deepening alpha-beta search
+- Quiescence search for tactical positions
+- Capture, promotion, and check-aware move ordering
+- Offline AI opponent with six strength settings
 - UCI command-line interface
 - CBurnett PNG piece assets
 
