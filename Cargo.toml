@@ -12,9 +12,22 @@ path = "src/main.rs"
 
 [dependencies]
 chess = "3.2.0"
+eframe = { version = "0.31.1", default-features = false, features = ["default_fonts", "glow", "android-native-activity", "x11", "wayland"] }
+image = { version = "0.25", default-features = false, features = ["png"] }
+log = "0.4"
+
+[target.'cfg(target_os = "android")'.dependencies]
+android_logger = "0.14"
+winit = "0.30"
 
 [profile.release]
 opt-level = 3
 lto = true
 codegen-units = 1
 strip = true
+
+[package.metadata.android]
+package = "dev.jayden.phoenixchess"
+label = "Phoenix Chess"
+min_sdk_version = 23
+target_sdk_version = 35
