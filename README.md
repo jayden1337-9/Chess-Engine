@@ -1,4 +1,4 @@
-# Phoenix Chess
+# Chess Engine
 
 A Rust chess engine and Android chess app, with a Windows build planned after Android is complete.
 
