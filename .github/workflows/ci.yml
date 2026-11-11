@@ -1,0 +1,19 @@
+name: Rust CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Fetch piece assets
+        run: sh scripts/fetch-pieces.sh
+      - name: Test
+        run: cargo test --locked
+      - name: Build
+        run: cargo build --release --locked
