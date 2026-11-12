@@ -26,7 +26,7 @@ pub async fn start() -> Result<(), JsValue> {
 
     WebRunner::new()
         .start(
-            canvas.id().as_str(),
+            canvas,
             WebOptions::default(),
             Box::new(|cc| Ok(Box::new(ChessApp::new(cc)))),
         )
