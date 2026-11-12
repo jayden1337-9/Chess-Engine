@@ -1,6 +1,6 @@
 # Chess Engine multiplayer server
 
-Standalone WebSocket server for room-code games. It is intentionally separate from the Android/iOS app build and is not part of the existing GitHub Actions workflows.
+Standalone Rust WebSocket server for Chess Engine global chat, match chat, and room-code multiplayer. It is separate from the Android and Windows app builds.
 
 ## Run
 
@@ -26,6 +26,11 @@ Send one JSON message per WebSocket text frame:
 
 The server returns `created` or `joined` with a randomly generated six-character room code, player color and initial FEN. Legal moves are checked against the authoritative server-side chess position and broadcast to both players.
 
+- Global chat: `{"type":"chat","scope":"global","name":"Player","message":"Hello everyone"}`
+- Match chat: `{"type":"chat","scope":"match","name":"Player","message":"Good luck"}`
+
+Global messages are broadcast to every connected client. Match messages are sent only to the two clients in the same room. Names are limited to 24 characters and messages to 500 characters.
+
 ## Current scope
 
-This is the multiplayer server foundation. The desktop/mobile app's online-room screens and WebSocket client still need to be connected to this protocol. Rooms are held in memory and are lost when the server restarts. Use a persistent store and add reconnection/authentication/rate limits before running a public production service.
+The shared Rust app now includes a WebSocket chat panel with Global and Match tabs, a server-address field, display name, and room create/join controls. The app does not ship with a hosted server address: deploy this server and enter its WebSocket URL ending in `/ws` in the app. Match chat requires creating or joining a room. Rooms are held in memory and are lost when the server restarts. Use a persistent store and add reconnection/authentication/rate limits before running a public production service.
