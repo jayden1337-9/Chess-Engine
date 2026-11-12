@@ -87,7 +87,7 @@ impl ChessApp {
             BoardStatus::Ongoing => "Black to move".to_owned(),
         };
         if self.engine_enabled && self.board.status() == BoardStatus::Ongoing && self.board.side_to_move() == Color::Black {
-            self.status = "Phoenix is thinking...".to_owned();
+            self.status = "Chess Engine is thinking...".to_owned();
             if let Some(reply) = best_move(&self.board, self.depth) {
                 self.board = self.board.make_move_new(reply);
                 self.history.push(self.board);
@@ -182,7 +182,7 @@ impl ChessApp {
     }
 
     fn draw_board(&mut self, ui: &mut egui::Ui) {
-        let size = ui.available_width().min(ui.available_height().max(280.0)).min(640.0);
+        let size = ui.available_width().min((ui.available_height() - 8.0).max(180.0)).min(640.0);
         let cell = size / 8.0;
         let (rect, response) = ui.allocate_exact_size(Vec2::splat(size), Sense::click());
         let painter = ui.painter_at(rect);
@@ -243,7 +243,7 @@ impl eframe::App for ChessApp {
         egui::TopBottomPanel::top("top").show(ctx, |ui| {
             ui.add_space(5.0);
             ui.horizontal(|ui| {
-                ui.heading("PHOENIX CHESS");
+                ui.heading("CHESS ENGINE");
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     ui.label(&self.status);
                 });
@@ -253,12 +253,20 @@ impl eframe::App for ChessApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.vertical_centered(|ui| {
                 ui.horizontal(|ui| {
-                    ui.label("Play as White");
-                    ui.checkbox(&mut self.engine_enabled, "Engine");
-                    ui.add(egui::Slider::new(&mut self.depth, 1..=6).text("AI strength"));
-                    ui.label(match self.depth { 1 => "Beginner", 2 => "Easy", 3 => "Medium", 4 => "Hard", 5 => "Expert", _ => "Phoenix" });
+                    if ui.selectable_label(self.engine_enabled, "Play vs AI").clicked() && !self.engine_enabled {
+                        self.engine_enabled = true;
+                        self.restart();
+                    }
+                    if ui.selectable_label(!self.engine_enabled, "Two players").clicked() && self.engine_enabled {
+                        self.engine_enabled = false;
+                        self.restart();
+                    }
+                    if self.engine_enabled {
+                        ui.add(egui::Slider::new(&mut self.depth, 1..=6).text("AI strength"));
+                    }
+                    ui.label(match self.depth { 1 => "Beginner", 2 => "Easy", 3 => "Medium", 4 => "Hard", 5 => "Expert", _ => "Chess Engine" });
                 });
-                ui.add_space(8.0);
+                ui.add_space(12.0);
                 self.draw_board(ui);
                 ui.add_space(10.0);
                 if let Some((_, _)) = self.promotion {
