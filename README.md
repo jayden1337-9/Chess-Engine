@@ -1,16 +1,18 @@
 # Chess Engine
 
-Chess Engine is a cross-platform chess project with a Rust engine, Android app, and lightweight browser client.
+Chess Engine is a cross-platform chess project built in Rust.
 
 ## Project targets
 
 - **Android:** Native Rust/egui application.
-- **Web:** Responsive browser client in `web/`; no installation required.
+- **WebAssembly:** The same Rust/egui application compiled to WebAssembly. Browser UI logic is Rust; no hand-written JavaScript, HTML, or CSS frontend is maintained.
 - **Server:** Rust WebSocket service in `server/` for room-code multiplayer.
 
-## Web version
+## WebAssembly build
 
-See [web/README.md](web/README.md) for local setup and multiplayer configuration. The web client currently supports local two-player games and online room-code play. Browser AI powered by the Rust engine is planned, not yet included.
+The `wasm32-unknown-unknown` target is built by the **WebAssembly Build** GitHub Actions workflow. It compiles the Rust app and generates the browser bindings as build output. See [web/README.md](web/README.md) for details.
+
+The WebAssembly build is a build target, not yet a hosted public website. A browser host still needs to load the generated WebAssembly package.
 
 ## Rust engine
 
