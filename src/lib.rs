@@ -485,3 +485,7 @@ pub extern "C" fn android_main(app: winit::platform::android::activity::AndroidA
         Box::new(|cc| Ok(Box::new(ChessApp::new(cc)))),
     );
 }
+
+
+#[cfg(target_arch = "wasm32")]
+mod web;
