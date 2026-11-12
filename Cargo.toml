@@ -1,5 +1,5 @@
 [package]
-name = "phoenix-chess"
+name = "chess-engine"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,7 +7,7 @@ edition = "2021"
 crate-type = ["rlib", "cdylib"]
 
 [[bin]]
-name = "phoenix-chess"
+name = "chess-engine"
 path = "src/main.rs"
 
 [dependencies]
@@ -27,7 +27,7 @@ codegen-units = 1
 strip = true
 
 [package.metadata.android]
-package = "dev.jayden.phoenixchess"
+package = "com.chess.engine"
 build_targets = ["aarch64-linux-android"]
 
 [package.metadata.android.sdk]
@@ -35,7 +35,7 @@ min_sdk_version = 23
 target_sdk_version = 35
 
 [package.metadata.android.application]
-label = "Phoenix Chess"
+label = "Chess Engine"
 
 [package.metadata.android.application.activity]
 name = "android.app.NativeActivity"
