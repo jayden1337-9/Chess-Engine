@@ -12,7 +12,7 @@ use futures_util::{SinkExt, StreamExt};
 use rand::{distributions::Alphanumeric, Rng};
 use serde::Deserialize;
 use serde_json::json;
-use std::{collections::HashMap, net::SocketAddr, str::FromStr, sync::Arc};
+use std::{collections::HashMap, net::SocketAddr, str::FromStr, sync::{Arc, atomic::{AtomicU64, Ordering}}};
 use tokio::sync::{mpsc, Mutex};
 
 type Tx = mpsc::UnboundedSender<Message>;
@@ -20,7 +20,10 @@ type Tx = mpsc::UnboundedSender<Message>;
 #[derive(Clone)]
 struct AppState {
     rooms: Arc<Mutex<HashMap<String, Room>>>,
+    clients: Arc<Mutex<HashMap<u64, Tx>>>,
 }
+
+static NEXT_CLIENT_ID: AtomicU64 = AtomicU64::new(1);
 
 struct Room {
     board: Board,
@@ -36,12 +39,13 @@ enum ClientMessage {
     Move { uci: String },
     Resign,
     DrawOffer,
-}
+    Chat { scope: String, name: String, message: String },
 
 #[tokio::main]
 async fn main() {
     let state = AppState {
         rooms: Arc::new(Mutex::new(HashMap::new())),
+        clients: Arc::new(Mutex::new(HashMap::new())),
     };
     let app = Router::new()
         .route("/health", get(|| async { "Chess Engine multiplayer server online" }))
@@ -75,6 +79,8 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
         }
     });
 
+    let client_id = NEXT_CLIENT_ID.fetch_add(1, Ordering::Relaxed);
+    state.clients.lock().await.insert(client_id, tx.clone());
     let mut room_code: Option<String> = None;
     let mut is_white = false;
 
@@ -167,6 +173,44 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                     if let Some(black) = &room.black { send(black, result).await; }
                 }
             }
+            ClientMessage::Chat { scope, name, message } => {
+                let message = message.trim();
+                let name = name.trim();
+                if message.is_empty() || message.chars().count() > 500 || name.is_empty() || name.chars().count() > 24 {
+                    send(&tx, json!({"type":"error","message":"Chat name or message is invalid (message max 500 characters, name max 24)"})).await;
+                    continue;
+                }
+                let payload = json!({
+                    "type":"chat",
+                    "scope":scope,
+                    "name":name,
+                    "message":message
+                });
+                match scope.as_str() {
+                    "global" => {
+                        let clients = state.clients.lock().await;
+                        for client in clients.values() {
+                            send(client, payload.clone()).await;
+                        }
+                    }
+                    "match" => {
+                        let Some(code) = room_code.as_ref() else {
+                            send(&tx, json!({"type":"error","message":"Join a match room before using match chat"})).await;
+                            continue;
+                        };
+                        let rooms = state.rooms.lock().await;
+                        if let Some(room) = rooms.get(code) {
+                            send(&room.white, payload.clone()).await;
+                            if let Some(black) = &room.black {
+                                send(black, payload).await;
+                            }
+                        } else {
+                            send(&tx, json!({"type":"error","message":"Match room not found"})).await;
+                        }
+                    }
+                    _ => send(&tx, json!({"type":"error","message":"Unknown chat scope"})).await,
+                }
+            }
             ClientMessage::DrawOffer => {
                 let Some(code) = room_code.as_ref() else { continue };
                 let rooms = state.rooms.lock().await;
@@ -182,6 +226,7 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
         }
     }
 
+    state.clients.lock().await.remove(&client_id);
     if let Some(code) = room_code {
         let mut rooms = state.rooms.lock().await;
         if is_white {
