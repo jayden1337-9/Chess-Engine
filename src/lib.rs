@@ -180,6 +180,7 @@ pub use app::ChessApp;
 
 #[cfg(target_os = "android")]
 #[no_mangle]
+#[allow(improper_ctypes_definitions)]
 pub extern "C" fn android_main(app: winit::platform::android::activity::AndroidApp) {
     android_logger::init_once(
         android_logger::Config::default().with_max_level(log::LevelFilter::Info),
