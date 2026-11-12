@@ -1,0 +1,23 @@
+name: Windows Desktop
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Fetch piece assets
+        shell: bash
+        run: sh scripts/fetch-pieces.sh
+      - name: Build Windows desktop app
+        run: cargo build --release --bin chess-engine
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chess-engine-windows-x64
+          path: target/release/chess-engine.exe
+          if-no-files-found: error
