@@ -40,6 +40,7 @@ enum ClientMessage {
     Resign,
     DrawOffer,
     Chat { scope: String, name: String, message: String },
+}
 
 #[tokio::main]
 async fn main() {
