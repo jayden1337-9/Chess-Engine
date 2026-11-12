@@ -1,4 +1,5 @@
 use crate::{best_move, uci_move};
+use crate::chat::{ChatClient, ChatTab};
 use chess::{Board, BoardStatus, ChessMove, Color, MoveGen, Piece, Square};
 use eframe::egui::{self, Color32, Pos2, Rect, Sense, TextureHandle, Vec2};
 use std::collections::HashMap;
@@ -13,6 +14,7 @@ pub struct ChessApp {
     engine_enabled: bool,
     depth: u8,
     status: String,
+    chat: ChatClient,
 }
 
 impl ChessApp {
@@ -53,6 +55,7 @@ impl ChessApp {
             engine_enabled: true,
             depth: 3,
             status: "Your move".to_owned(),
+            chat: ChatClient::default(),
         }
     }
 
@@ -240,6 +243,7 @@ impl ChessApp {
 
 impl eframe::App for ChessApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        self.chat.poll();
         egui::TopBottomPanel::top("top").show(ctx, |ui| {
             ui.add_space(5.0);
             ui.horizontal(|ui| {
@@ -287,6 +291,67 @@ impl eframe::App for ChessApp {
                     let history = if self.moves.is_empty() { "Move history".to_owned() } else { self.moves.join("   ") };
                     ui.label(history);
                 });
+                egui::CollapsingHeader::new("Chat")
+                    .default_open(false)
+                    .show(ui, |ui| {
+                        ui.horizontal_wrapped(|ui| {
+                            ui.label("Server");
+                            ui.text_edit_singleline(&mut self.chat.url);
+                            if ui.button("Connect").clicked() {
+                                self.chat.connect();
+                            }
+                        });
+                        ui.horizontal(|ui| {
+                            ui.label("Name");
+                            ui.add(egui::TextEdit::singleline(&mut self.chat.name).desired_width(110.0));
+                            if ui.button("Create room").clicked() {
+                                self.chat.create_room();
+                            }
+                        });
+                        ui.horizontal(|ui| {
+                            ui.label("Room code");
+                            ui.add(egui::TextEdit::singleline(&mut self.chat.room_code).desired_width(100.0));
+                            if ui.button("Join").clicked() {
+                                self.chat.join_room();
+                            }
+                        });
+                        ui.horizontal(|ui| {
+                            if ui.selectable_label(self.chat.tab == ChatTab::Global, "Global").clicked() {
+                                self.chat.tab = ChatTab::Global;
+                            }
+                            if ui.selectable_label(self.chat.tab == ChatTab::Match, "Match").clicked() {
+                                self.chat.tab = ChatTab::Match;
+                            }
+                        });
+                        let active_scope = if self.chat.tab == ChatTab::Global { "global" } else { "match" };
+                        egui::ScrollArea::vertical().max_height(130.0).stick_to_bottom(true).show(ui, |ui| {
+                            let mut shown = false;
+                            for line in &self.chat.lines {
+                                if line.scope == active_scope {
+                                    shown = true;
+                                    ui.horizontal_wrapped(|ui| {
+                                        ui.strong(format!("{}:", line.name));
+                                        ui.label(&line.message);
+                                    });
+                                }
+                            }
+                            if !shown {
+                                ui.weak(if active_scope == "global" { "No global messages yet" } else { "No match messages yet" });
+                            }
+                        });
+                        ui.horizontal(|ui| {
+                            let response = ui.add(
+                                egui::TextEdit::singleline(&mut self.chat.input)
+                                    .hint_text("Write a message...")
+                                    .desired_width(ui.available_width() - 58.0)
+                            );
+                            let enter = response.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter));
+                            if ui.button("Send").clicked() || enter {
+                                self.chat.send_chat();
+                            }
+                        });
+                        ui.small(&self.chat.status);
+                    });
             });
         });
         ctx.request_repaint();
