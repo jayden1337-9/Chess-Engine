@@ -213,6 +213,14 @@ impl ChessApp {
                         painter.image(texture.id(), piece_rect, Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)), Color32::WHITE);
                     }
                 }
+                let coordinate = format!("{}{}", (b'a' + col as u8) as char, 8 - row);
+                painter.text(
+                    cell_rect.left_top() + Vec2::new(3.0, 2.0),
+                    egui::Align2::LEFT_TOP,
+                    coordinate,
+                    egui::FontId::proportional((cell * 0.13).max(8.0)),
+                    if light { Color32::from_gray(105) } else { Color32::from_gray(235) },
+                );
             }
         }
         if response.clicked() {
@@ -252,20 +260,6 @@ impl eframe::App for ChessApp {
                 });
                 ui.add_space(8.0);
                 self.draw_board(ui);
-                ui.add_space(10.0);
-                ui.group(|ui| {
-                    ui.label("Piece locations");
-                    ui.columns(2, |columns| {
-                        columns[0].strong("White");
-                        for entry in self.piece_locations(Color::White) {
-                            columns[0].label(entry);
-                        }
-                        columns[1].strong("Black");
-                        for entry in self.piece_locations(Color::Black) {
-                            columns[1].label(entry);
-                        }
-                    });
-                });
                 ui.add_space(10.0);
                 if let Some((_, _)) = self.promotion {
                     ui.horizontal(|ui| {
