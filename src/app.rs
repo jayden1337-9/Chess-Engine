@@ -243,7 +243,7 @@ impl eframe::App for ChessApp {
         egui::TopBottomPanel::top("top").show(ctx, |ui| {
             ui.add_space(5.0);
             ui.horizontal(|ui| {
-                ui.heading("CHESS ENGINE");
+                ui.heading("Chess Engine");
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     ui.label(&self.status);
                 });
