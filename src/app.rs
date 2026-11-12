@@ -253,11 +253,11 @@ impl eframe::App for ChessApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.vertical_centered(|ui| {
                 ui.horizontal(|ui| {
-                    if ui.selectable_label(self.engine_enabled, "Play vs AI").clicked() && !self.engine_enabled {
+                    if ui.selectable_label(self.engine_enabled, "PvA").clicked() && !self.engine_enabled {
                         self.engine_enabled = true;
                         self.restart();
                     }
-                    if ui.selectable_label(!self.engine_enabled, "Two players").clicked() && self.engine_enabled {
+                    if ui.selectable_label(!self.engine_enabled, "PvP").clicked() && self.engine_enabled {
                         self.engine_enabled = false;
                         self.restart();
                     }
