@@ -28,9 +28,9 @@ impl ChessApp {
             ('k', include_bytes!("../assets/pieces/bK.png")),
             ('q', include_bytes!("../assets/pieces/bQ.png")),
             ('r', include_bytes!("../assets/pieces/bR.png")),
-            ('b', include_bytes!("../assets/pieces/bB.png')),
-            ('n', include_bytes!("../assets/pieces/bN.png')),
-            ('p', include_bytes!("../assets/pieces/bP.png')),
+            ('b', include_bytes!("../assets/pieces/bB.png"),
+            ('n', include_bytes!("../assets/pieces/bN.png"),
+            ('p', include_bytes!("../assets/pieces/bP.png"),
         ];
         for (key, bytes) in assets {
             let image = image::load_from_memory(bytes).expect("piece PNG").to_rgba8();
