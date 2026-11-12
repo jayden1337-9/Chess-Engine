@@ -15,6 +15,8 @@ chess = "3.2.0"
 eframe = { version = "0.31.1", default-features = false, features = ["default_fonts", "glow", "android-native-activity", "x11", "wayland"] }
 image = { version = "0.25", default-features = false, features = ["png"] }
 log = "0.4"
+ewebsock = { version = "0.8", features = ["tls"] }
+serde_json = "1"
 
 [target.'cfg(target_os = "android")'.dependencies]
 android_logger = "0.14"
