@@ -29,4 +29,16 @@ The CBurnett PNGs are fetched with `scripts/fetch-pieces.sh`. See [asset attribu
 
 ## Targets
 
-Android is the first application target. Windows x64 follows once the Android app is complete.
+Android is the first application target. iOS project preparation is documented in `ios/README.md`; iOS builds are intentionally not part of GitHub Actions. Windows x64 follows once the Android app is complete.
+
+
+## Game modes
+
+- Play vs AI
+- Local two-player mode on one device
+
+Online room-code multiplayer is being developed separately; the server protocol and deployment notes will live under `server/`.
+
+## iOS
+
+See [iOS build preparation](ios/README.md). No iOS workflow is configured or triggered by this repository.
