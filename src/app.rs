@@ -156,6 +156,31 @@ impl ChessApp {
         self.status = "New game".to_owned();
     }
 
+    fn piece_locations(&self, color: Color) -> Vec<String> {
+        let pieces = [
+            (Piece::King, "King"),
+            (Piece::Queen, "Queen"),
+            (Piece::Rook, "Rook"),
+            (Piece::Bishop, "Bishop"),
+            (Piece::Knight, "Knight"),
+            (Piece::Pawn, "Pawn"),
+        ];
+        pieces.iter().map(|(piece, name)| {
+            let squares: Vec<String> = (0..8).flat_map(|rank| {
+                (0..8).filter_map(move |file| {
+                    let square = Square::make_square(
+                        chess::Rank::from_index(rank),
+                        chess::File::from_index(file),
+                    );
+                    (self.board.piece_on(square) == Some(*piece)
+                        && self.board.color_on(square) == Some(color))
+                        .then(|| square.to_string())
+                })
+            }).collect();
+            format!("{}: {}", name, if squares.is_empty() { "—".to_owned() } else { squares.join(", ") })
+        }).collect()
+    }
+
     fn draw_board(&mut self, ui: &mut egui::Ui) {
         let size = ui.available_width().min(ui.available_height().max(280.0)).min(640.0);
         let cell = size / 8.0;
@@ -227,6 +252,20 @@ impl eframe::App for ChessApp {
                 });
                 ui.add_space(8.0);
                 self.draw_board(ui);
+                ui.add_space(10.0);
+                ui.group(|ui| {
+                    ui.label("Piece locations");
+                    ui.columns(2, |columns| {
+                        columns[0].strong("White");
+                        for entry in self.piece_locations(Color::White) {
+                            columns[0].label(entry);
+                        }
+                        columns[1].strong("Black");
+                        for entry in self.piece_locations(Color::Black) {
+                            columns[1].label(entry);
+                        }
+                    });
+                });
                 ui.add_space(10.0);
                 if let Some((_, _)) = self.promotion {
                     ui.horizontal(|ui| {
