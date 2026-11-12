@@ -1,44 +1,36 @@
 # Chess Engine
 
-A Rust chess engine and Android chess app, with a Windows build planned after Android is complete.
+Chess Engine is a cross-platform chess project with a Rust engine, Android app, and lightweight browser client.
 
-## Current development
+## Project targets
 
-- Rust engine core
-- Legal move generation through the `chess` crate
-- Material and piece-activity evaluation
-- Iterative-deepening alpha-beta search
-- Quiescence search for tactical positions
-- Capture, promotion, and check-aware move ordering
-- Offline AI opponent with six strength settings
-- UCI command-line interface
-- CBurnett PNG piece assets
+- **Android:** Native Rust/egui application.
+- **Web:** Responsive browser client in `web/`; no installation required.
+- **Server:** Rust WebSocket service in `server/` for room-code multiplayer.
 
-## Build the engine
+## Web version
+
+See [web/README.md](web/README.md) for local setup and multiplayer configuration. The web client currently supports local two-player games and online room-code play. Browser AI powered by the Rust engine is planned, not yet included.
+
+## Rust engine
+
+The engine includes legal move generation, material and piece-activity evaluation, iterative-deepening alpha-beta search, quiescence search, and move ordering.
+
+Run tests and the command-line UCI engine with:
 
 ```sh
 cargo test
 cargo run --release
 ```
 
-The command-line build speaks UCI on standard input and output.
+## Android
+
+Android is the first native application target. Build instructions and workflows are in `.github/workflows/`.
+
+## Multiplayer server
+
+See [server/README.md](server/README.md). The server must be deployed separately and exposed over TLS before online play is available.
 
 ## Piece artwork
 
-The CBurnett PNGs are fetched with `scripts/fetch-pieces.sh`. See [asset attribution](assets/pieces/ATTRIBUTION.md) for the source and license.
-
-## Targets
-
-Android is the first application target. iOS project preparation is documented in `ios/README.md`; iOS builds are intentionally not part of GitHub Actions. Windows x64 follows once the Android app is complete.
-
-
-## Game modes
-
-- Play vs AI
-- Local two-player mode on one device
-
-Online room-code multiplayer is being developed separately; the server protocol and deployment notes will live under `server/`.
-
-## iOS
-
-See [iOS build preparation](ios/README.md). No iOS workflow is configured or triggered by this repository.
+The CBurnett PNG assets are fetched with `scripts/fetch-pieces.sh`. See [asset attribution](assets/pieces/ATTRIBUTION.md) for source and license.
