@@ -26,6 +26,8 @@ jobs:
       - name: Fetch piece assets
         run: sh scripts/fetch-pieces.sh
       - name: Build APK
+        env:
+          JAVA_TOOL_OPTIONS: --enable-native-access=ALL-UNNAMED
         run: cargo apk build --lib --target aarch64-linux-android
       - uses: actions/upload-artifact@v4
         with:
