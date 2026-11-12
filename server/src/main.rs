@@ -184,15 +184,14 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
 
     if let Some(code) = room_code {
         let mut rooms = state.rooms.lock().await;
-        if let Some(room) = rooms.get_mut(&code) {
-            let notice = json!({"type":"opponent_disconnected"});
-            if is_white {
-                if let Some(black) = &room.black { send(black, notice).await; }
-                rooms.remove(&code);
-            } else {
-                send(&room.white, notice).await;
-                if let Some(room) = rooms.get_mut(&code) { room.black = None; }
+        if is_white {
+            if let Some(room) = rooms.remove(&code) {
+                let notice = json!({"type":"opponent_disconnected"});
+                if let Some(black) = room.black { send(&black, notice).await; }
             }
+        } else if let Some(room) = rooms.get_mut(&code) {
+            send(&room.white, json!({"type":"opponent_disconnected"})).await;
+            room.black = None;
         }
     }
     writer.abort();
