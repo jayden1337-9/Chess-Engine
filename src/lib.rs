@@ -466,6 +466,7 @@ mod tests {
 }
 
 mod app;
+mod chat;
 pub use app::ChessApp;
 
 #[cfg(target_os = "android")]
