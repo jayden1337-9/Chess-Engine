@@ -243,7 +243,8 @@ impl eframe::App for ChessApp {
                 });
                 ui.add_space(8.0);
                 egui::ScrollArea::horizontal().show(ui, |ui| {
-                    ui.label(if self.moves.is_empty() { "Move history" } else { self.moves.join("   ") });
+                    let history = if self.moves.is_empty() { "Move history".to_owned() } else { self.moves.join("   ") };
+                    ui.label(history);
                 });
             });
         });
