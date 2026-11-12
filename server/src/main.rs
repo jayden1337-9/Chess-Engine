@@ -182,7 +182,7 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                 }
                 let payload = json!({
                     "type":"chat",
-                    "scope":scope,
+                    "scope":scope.clone(),
                     "name":name,
                     "message":message
                 });
