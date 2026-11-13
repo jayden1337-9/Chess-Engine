@@ -12,7 +12,7 @@ Chess Engine is a cross-platform chess project built in Rust.
 
 The `wasm32-unknown-unknown` target is built by the **WebAssembly Build** GitHub Actions workflow. It compiles the Rust app and generates the browser bindings as build output. See [web/README.md](web/README.md) for details.
 
-The WebAssembly build is a build target, not yet a hosted public website. A browser host still needs to load the generated WebAssembly package.
+The release server binary embeds the generated WebAssembly app and serves it at `https://chessengine.freesrv.com/`; the same server provides multiplayer at `wss://chessengine.freesrv.com/ws`.
 
 ## Rust engine
 
@@ -31,7 +31,7 @@ Android is the first native application target. Build instructions and workflows
 
 ## Multiplayer server
 
-See [server/README.md](server/README.md). The server must be deployed separately and exposed over TLS before online play is available.
+See [server/README.md](server/README.md). The server hosts the browser app and multiplayer service together at `chessengine.freesrv.com`.
 
 ## Piece artwork
 
