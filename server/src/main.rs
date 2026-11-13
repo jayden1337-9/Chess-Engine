@@ -122,7 +122,7 @@ async fn persist_event(state: &AppState, event: serde_json::Value) {
             return;
         }
     };
-    line.push(b'\\n');
+    line.push(b'\n');
     use tokio::io::AsyncWriteExt;
     match tokio::fs::OpenOptions::new().create(true).append(true).open(path).await {
         Ok(mut file) => {
