@@ -12,7 +12,7 @@ use futures_util::{SinkExt, StreamExt};
 use rand::{distributions::Alphanumeric, Rng};
 use serde::Deserialize;
 use serde_json::json;
-use std::{collections::HashMap, net::SocketAddr, str::FromStr, sync::{Arc, atomic::{AtomicU64, Ordering}}};
+use std::{collections::HashMap, net::SocketAddr, path::Path, str::FromStr, sync::{Arc, atomic::{AtomicU64, Ordering}}, time::{SystemTime, UNIX_EPOCH}};
 use tokio::sync::{mpsc, Mutex};
 
 type Tx = mpsc::UnboundedSender<Message>;
@@ -21,6 +21,7 @@ type Tx = mpsc::UnboundedSender<Message>;
 struct AppState {
     rooms: Arc<Mutex<HashMap<String, Room>>>,
     clients: Arc<Mutex<HashMap<u64, Tx>>>,
+    persistence_lock: Arc<Mutex<()>>,
 }
 
 static NEXT_CLIENT_ID: AtomicU64 = AtomicU64::new(1);
@@ -73,6 +74,7 @@ async fn main() {
     let state = AppState {
         rooms: Arc::new(Mutex::new(HashMap::new())),
         clients: Arc::new(Mutex::new(HashMap::new())),
+        persistence_lock: Arc::new(Mutex::new(())),
     };
     let app = Router::new()
         .route("/", get(index))
@@ -92,6 +94,47 @@ async fn main() {
 
 async fn ws_handler(ws: WebSocketUpgrade, State(state): State<AppState>) -> impl IntoResponse {
     ws.on_upgrade(move |socket| handle_socket(socket, state))
+}
+
+// Append-only JSONL storage. Existing records are never truncated or removed.
+async fn persist_event(state: &AppState, event: serde_json::Value) {
+    let _guard = state.persistence_lock.lock().await;
+    let path = std::env::var("CHESS_DATA_FILE")
+        .unwrap_or_else(|_| "data/chess_events.jsonl".to_owned());
+    let path = Path::new(&path);
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            if let Err(error) = tokio::fs::create_dir_all(parent).await {
+                eprintln!("Could not create persistence directory: {error}");
+                return;
+            }
+        }
+    }
+    let mut record = event;
+    record["saved_at_unix"] = json!(SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs());
+    let mut line = match serde_json::to_vec(&record) {
+        Ok(value) => value,
+        Err(error) => {
+            eprintln!("Could not encode persistence event: {error}");
+            return;
+        }
+    };
+    line.push(b'\\n');
+    use tokio::io::AsyncWriteExt;
+    match tokio::fs::OpenOptions::new().create(true).append(true).open(path).await {
+        Ok(mut file) => {
+            if let Err(error) = file.write_all(&line).await {
+                eprintln!("Could not append persistence event: {error}");
+            }
+            if let Err(error) = file.flush().await {
+                eprintln!("Could not flush persistence event: {error}");
+            }
+        }
+        Err(error) => eprintln!("Could not open persistence file: {error}"),
+    }
 }
 
 async fn send(tx: &Tx, value: serde_json::Value) {
@@ -144,6 +187,7 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                 });
                 room_code = Some(code.clone());
                 is_white = true;
+                persist_event(&state, json!({"event":"room_created","room":code,"initial_fen":Board::default().to_string()})).await;
                 send(&tx, json!({"type":"created","code":code,"color":"white","fen":Board::default().to_string()})).await;
             }
             ClientMessage::Join { code } => {
@@ -163,6 +207,7 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                     let white = room.white.clone();
                     room_code = Some(code.clone());
                     is_white = false;
+                    persist_event(&state, json!({"event":"room_joined","room":code})).await;
                     send(&tx, json!({"type":"joined","code":code,"color":"black","fen":fen})).await;
                     send(&white, json!({"type":"opponent_joined","fen":fen})).await;
                 } else {
@@ -194,6 +239,7 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                     continue;
                 }
                 room.board = room.board.make_move_new(mv);
+                persist_event(&state, json!({"event":"move","room":code,"uci":uci,"fen":room.board.to_string()})).await;
                 let update = json!({"type":"move","uci":uci,"fen":room.board.to_string()});
                 if is_white {
                     if let Some(black) = &room.black { send(black, update).await; }
@@ -219,6 +265,7 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                 let rooms = state.rooms.lock().await;
                 if let Some(room) = rooms.get(code) {
                     let result = json!({"type":"game_over","result":if is_white {"black_wins"} else {"white_wins"},"reason":"resignation"});
+                    persist_event(&state, json!({"event":"game_over","room":code,"result":if is_white {"black_wins"} else {"white_wins"},"reason":"resignation"})).await;
                     send(&room.white, result.clone()).await;
                     if let Some(black) = &room.black { send(black, result).await; }
                 }
@@ -236,6 +283,7 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                     "name":name,
                     "message":message
                 });
+                persist_event(&state, json!({"event":"chat","scope":scope,"room":room_code,"name":name,"message":message})).await;
                 match scope.as_str() {
                     "global" => {
                         let clients = state.clients.lock().await;
