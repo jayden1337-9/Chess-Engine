@@ -1,7 +1,7 @@
 use crate::{best_move, uci_move};
 use crate::chat::{ChatClient, ChatTab};
 use chess::{Board, BoardStatus, ChessMove, Color, MoveGen, Piece, Square};
-use eframe::egui::{self, Color32, Pos2, Rect, Sense, TextureHandle, Vec2};
+use eframe::egui::{self, Color32, Pos2, Rect, RichText, Sense, TextureHandle, Vec2};
 use std::{collections::HashMap, str::FromStr};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -50,6 +50,7 @@ impl ChessApp {
         style.visuals.window_fill = Color32::from_rgb(29, 31, 36);
         cc.egui_ctx.set_style(style);
         Self {
+            page: AppPage::Home,
             board: Board::default(),
             history: vec![Board::default()],
             moves: Vec::new(),
