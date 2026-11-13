@@ -239,7 +239,7 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                     continue;
                 }
                 room.board = room.board.make_move_new(mv);
-                persist_event(&state, json!({"event":"move","room":code,"uci":uci,"fen":room.board.to_string()})).await;
+                persist_event(&state, json!({"event":"move","room":code,"uci":uci.clone(),"fen":room.board.to_string()})).await;
                 let update = json!({"type":"move","uci":uci,"fen":room.board.to_string()});
                 if is_white {
                     if let Some(black) = &room.black { send(black, update).await; }
@@ -248,11 +248,14 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                 }
                 match room.board.status() {
                     chess::BoardStatus::Checkmate => {
+                        let winner = if room.board.side_to_move() == chess::Color::White {"black_wins"} else {"white_wins"};
+                        persist_event(&state, json!({"event":"game_over","room":code,"result":winner,"reason":"checkmate"})).await;
                         let result = json!({"type":"game_over","result":if room.board.side_to_move() == chess::Color::White {"black_wins"} else {"white_wins"},"reason":"checkmate"});
                         send(&room.white, result.clone()).await;
                         if let Some(black) = &room.black { send(black, result).await; }
                     }
                     chess::BoardStatus::Stalemate => {
+                        persist_event(&state, json!({"event":"game_over","room":code,"result":"draw","reason":"stalemate"})).await;
                         let result = json!({"type":"game_over","result":"draw","reason":"stalemate"});
                         send(&room.white, result.clone()).await;
                         if let Some(black) = &room.black { send(black, result).await; }
@@ -283,7 +286,7 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                     "name":name,
                     "message":message
                 });
-                persist_event(&state, json!({"event":"chat","scope":scope,"room":room_code,"name":name,"message":message})).await;
+                persist_event(&state, json!({"event":"chat","scope":scope.clone(),"room":room_code.clone(),"name":name,"message":message})).await;
                 match scope.as_str() {
                     "global" => {
                         let clients = state.clients.lock().await;
