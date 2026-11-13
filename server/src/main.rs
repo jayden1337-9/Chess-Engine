@@ -3,7 +3,7 @@ use axum::{
         ws::{Message, WebSocket, WebSocketUpgrade},
         State,
     },
-    response::IntoResponse,
+    response::{Html, IntoResponse, Response},
     routing::get,
     Router,
 };
@@ -24,6 +24,32 @@ struct AppState {
 }
 
 static NEXT_CLIENT_ID: AtomicU64 = AtomicU64::new(1);
+
+// The browser shell is returned by the Rust server; the JavaScript glue and
+// WebAssembly binary are generated from the Rust app during the release build.
+const WEB_JS: &[u8] = include_bytes!("../../web/pkg/chess_engine.js");
+const WEB_WASM: &[u8] = include_bytes!("../../web/pkg/chess_engine_bg.wasm");
+
+async fn index() -> Html<&'static str> {
+    Html(r#"<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><meta name="theme-color" content="#101318"><title>Chess Engine</title></head><body><script type="module">import init from '/app/chess_engine.js'; init();</script></body></html>"#)
+}
+
+async fn wasm_javascript() -> Response {
+    Response::builder()
+        .header(axum::http::header::CONTENT_TYPE, "text/javascript; charset=utf-8")
+        .header(axum::http::header::CACHE_CONTROL, "public, max-age=300")
+        .body(axum::body::Body::from(WEB_JS))
+        .expect("valid JavaScript response")
+}
+
+async fn wasm_binary() -> Response {
+    Response::builder()
+        .header(axum::http::header::CONTENT_TYPE, "application/wasm")
+        .header(axum::http::header::CACHE_CONTROL, "public, max-age=300")
+        .body(axum::body::Body::from(WEB_WASM))
+        .expect("valid WebAssembly response")
+}
+
 
 struct Room {
     board: Board,
@@ -49,6 +75,9 @@ async fn main() {
         clients: Arc::new(Mutex::new(HashMap::new())),
     };
     let app = Router::new()
+        .route("/", get(index))
+        .route("/app/chess_engine.js", get(wasm_javascript))
+        .route("/app/chess_engine_bg.wasm", get(wasm_binary))
         .route("/health", get(|| async { "Chess Engine multiplayer server online" }))
         .route("/ws", get(ws_handler))
         .with_state(state);
