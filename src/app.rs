@@ -325,17 +325,21 @@ impl eframe::App for ChessApp {
                         ui.add_space(14.0);
                         ui.heading("Explore");
                         ui.columns(3, |columns| {
-                            for (column, title, description, page) in [
-                                (&mut columns[0], "Puzzles", "Sharpen your tactics.", AppPage::Puzzles),
-                                (&mut columns[1], "Learn", "Openings and chess basics.", AppPage::Learn),
-                                (&mut columns[2], "Watch", "Follow featured games.", AppPage::Watch),
-                            ] {
-                                column.group(|ui| {
-                                    ui.heading(title);
-                                    ui.label(description);
-                                    if ui.button("Explore").clicked() { self.page = page; }
-                                });
-                            }
+                            columns[0].group(|ui| {
+                                ui.heading("Puzzles");
+                                ui.label("Sharpen your tactics.");
+                                if ui.button("Explore").clicked() { self.page = AppPage::Puzzles; }
+                            });
+                            columns[1].group(|ui| {
+                                ui.heading("Learn");
+                                ui.label("Openings and chess basics.");
+                                if ui.button("Explore").clicked() { self.page = AppPage::Learn; }
+                            });
+                            columns[2].group(|ui| {
+                                ui.heading("Watch");
+                                ui.label("Follow featured games.");
+                                if ui.button("Explore").clicked() { self.page = AppPage::Watch; }
+                            });
                         });
                         ui.add_space(14.0);
                         ui.group(|ui| {
