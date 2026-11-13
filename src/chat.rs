@@ -1,5 +1,6 @@
 use ewebsock::{WsEvent, WsMessage, WsReceiver, WsSender};
 use serde_json::{json, Value};
+use chess::Color;
 use std::collections::VecDeque;
 
 #[derive(Clone)]
@@ -26,6 +27,8 @@ pub struct ChatClient {
     receiver: Option<WsReceiver>,
     opened: bool,
     pub lines: VecDeque<ChatLine>,
+    pub player_color: Option<Color>,
+    pub remote_moves: VecDeque<(String, String)>,
 }
 
 impl Default for ChatClient {
@@ -41,6 +44,8 @@ impl Default for ChatClient {
             receiver: None,
             opened: false,
             lines: VecDeque::new(),
+            player_color: None,
+            remote_moves: VecDeque::new(),
         }
     }
 }
@@ -82,6 +87,7 @@ impl ChatClient {
                     self.opened = false;
                     self.status = "Disconnected".to_owned();
                     self.room_code.clear();
+                    self.player_color = None;
                 }
                 WsEvent::Error(error) => self.status = format!("Connection error: {error}"),
                 WsEvent::Message(WsMessage::Text(text)) => {
@@ -98,11 +104,20 @@ impl ChatClient {
                             }
                             "created" | "joined" => {
                                 self.room_code = value["code"].as_str().unwrap_or_default().to_owned();
+                                self.player_color = match value["color"].as_str() { Some("white") => Some(Color::White), Some("black") => Some(Color::Black), _ => self.player_color };
                                 self.status = format!("Connected · room {}", self.room_code);
                             }
                             "error" => {
                                 self.status = value["message"].as_str().unwrap_or("Server error").to_owned();
                             }
+                            "move" => {
+                                let uci = value["uci"].as_str().unwrap_or_default().to_owned();
+                                let fen = value["fen"].as_str().unwrap_or_default().to_owned();
+                                if !uci.is_empty() && !fen.is_empty() { self.remote_moves.push_back((uci, fen)); }
+                            }
+                            "opponent_joined" => { self.status = "Opponent connected · game ready".to_owned(); }
+                            "game_over" => { self.status = format!("Game over: {}", value["reason"].as_str().unwrap_or("finished")); }
+                            "draw_offer" => { self.status = "Opponent offered a draw".to_owned(); }
                             "opponent_disconnected" => {
                                 self.status = "Opponent disconnected".to_owned();
                             }
@@ -123,6 +138,14 @@ impl ChatClient {
         if let Some(sender) = &mut self.sender {
             sender.send(WsMessage::Text(value.to_string()));
         }
+    }
+
+    pub fn send_move(&mut self, uci: &str) {
+        self.send_value(json!({"type":"move","uci":uci}));
+    }
+
+    pub fn take_remote_moves(&mut self) -> Vec<(String, String)> {
+        self.remote_moves.drain(..).collect()
     }
 
     pub fn create_room(&mut self) {
