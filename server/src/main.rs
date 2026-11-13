@@ -176,6 +176,10 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                 };
                 let mut rooms = state.rooms.lock().await;
                 let Some(room) = rooms.get_mut(code) else { continue };
+                if room.black.is_none() {
+                    send(&tx, json!({"type":"error","message":"Waiting for an opponent to join"})).await;
+                    continue;
+                }
                 let expected = if is_white { chess::Color::White } else { chess::Color::Black };
                 if room.board.side_to_move() != expected {
                     send(&tx, json!({"type":"error","message":"Not your turn"})).await;
@@ -191,8 +195,24 @@ async fn handle_socket(socket: WebSocket, state: AppState) {
                 }
                 room.board = room.board.make_move_new(mv);
                 let update = json!({"type":"move","uci":uci,"fen":room.board.to_string()});
-                send(&room.white, update.clone()).await;
-                if let Some(black) = &room.black { send(black, update).await; }
+                if is_white {
+                    if let Some(black) = &room.black { send(black, update).await; }
+                } else {
+                    send(&room.white, update).await;
+                }
+                match room.board.status() {
+                    chess::BoardStatus::Checkmate => {
+                        let result = json!({"type":"game_over","result":if room.board.side_to_move() == chess::Color::White {"black_wins"} else {"white_wins"},"reason":"checkmate"});
+                        send(&room.white, result.clone()).await;
+                        if let Some(black) = &room.black { send(black, result).await; }
+                    }
+                    chess::BoardStatus::Stalemate => {
+                        let result = json!({"type":"game_over","result":"draw","reason":"stalemate"});
+                        send(&room.white, result.clone()).await;
+                        if let Some(black) = &room.black { send(black, result).await; }
+                    }
+                    chess::BoardStatus::Ongoing => {}
+                }
             }
             ClientMessage::Resign => {
                 let Some(code) = room_code.as_ref() else { continue };
