@@ -2,7 +2,7 @@ use crate::{best_move, uci_move};
 use crate::chat::{ChatClient, ChatTab};
 use chess::{Board, BoardStatus, ChessMove, Color, MoveGen, Piece, Square};
 use eframe::egui::{self, Color32, Pos2, Rect, Sense, TextureHandle, Vec2};
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 
 pub struct ChessApp {
     board: Board,
@@ -76,6 +76,10 @@ impl ChessApp {
     }
 
     fn commit(&mut self, mv: ChessMove) {
+        if !self.engine_enabled && !self.chat.room_code.is_empty() {
+            if self.chat.player_color != Some(self.board.side_to_move()) { return; }
+            self.chat.send_move(&uci_move(mv));
+        }
         self.board = self.board.make_move_new(mv);
         self.history.push(self.board);
         self.moves.push(uci_move(mv));
@@ -122,7 +126,7 @@ impl ChessApp {
                 return;
             }
         }
-        let selectable = if self.engine_enabled { Color::White } else { self.board.side_to_move() };
+        let selectable = if self.engine_enabled { Color::White } else { self.chat.player_color.unwrap_or_else(|| self.board.side_to_move()) };
         if self.board.color_on(square) == Some(selectable) {
             self.selected = Some(square);
         } else {
@@ -244,6 +248,21 @@ impl ChessApp {
 impl eframe::App for ChessApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.chat.poll();
+        for (uci, fen) in self.chat.take_remote_moves() {
+            if let Ok(board) = Board::from_str(&fen) {
+                self.board = board;
+                self.history.push(board);
+                self.moves.push(uci);
+                self.selected = None;
+                self.promotion = None;
+                self.status = match board.status() {
+                    BoardStatus::Checkmate => "Checkmate".to_owned(),
+                    BoardStatus::Stalemate => "Draw by stalemate".to_owned(),
+                    BoardStatus::Ongoing if board.checkers().popcnt() > 0 => "Check".to_owned(),
+                    BoardStatus::Ongoing => "Opponent moved".to_owned(),
+                };
+            }
+        }
         egui::TopBottomPanel::top("top").show(ctx, |ui| {
             ui.add_space(5.0);
             ui.horizontal(|ui| {
