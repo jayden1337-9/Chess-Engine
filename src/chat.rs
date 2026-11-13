@@ -31,7 +31,7 @@ pub struct ChatClient {
 impl Default for ChatClient {
     fn default() -> Self {
         Self {
-            url: String::new(),
+            url: "wss://chessengine.wispbyte.app/ws".to_owned(),
             name: "Player".to_owned(),
             room_code: String::new(),
             status: "Not connected".to_owned(),
