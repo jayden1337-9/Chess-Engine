@@ -31,7 +31,7 @@ const WEB_JS: &[u8] = include_bytes!("../../web/pkg/chess_engine.js");
 const WEB_WASM: &[u8] = include_bytes!("../../web/pkg/chess_engine_bg.wasm");
 
 async fn index() -> Html<&'static str> {
-    Html(r#"<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><meta name="theme-color" content="#101318"><title>Chess Engine</title></head><body><script type="module">import init from '/app/chess_engine.js'; init();</script></body></html>"#)
+    Html(r##"<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><meta name="theme-color" content="#101318"><title>Chess Engine</title></head><body><script type="module">import init from '/app/chess_engine.js'; init();</script></body></html>"##)
 }
 
 async fn wasm_javascript() -> Response {
