@@ -4,7 +4,11 @@ use chess::{Board, BoardStatus, ChessMove, Color, MoveGen, Piece, Square};
 use eframe::egui::{self, Color32, Pos2, Rect, Sense, TextureHandle, Vec2};
 use std::{collections::HashMap, str::FromStr};
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum AppPage { Home, Play, Puzzles, Learn, Watch, Profile }
+
 pub struct ChessApp {
+    page: AppPage,
     board: Board,
     history: Vec<Board>,
     moves: Vec<String>,
@@ -263,114 +267,215 @@ impl eframe::App for ChessApp {
                 };
             }
         }
-        egui::TopBottomPanel::top("top").show(ctx, |ui| {
+
+        egui::TopBottomPanel::top("site_header").show(ctx, |ui| {
             ui.add_space(5.0);
-            ui.horizontal(|ui| {
-                ui.heading("Chess Engine");
+            ui.horizontal_wrapped(|ui| {
+                ui.heading("♟ Chess Engine");
+                ui.separator();
+                for (page, label) in [
+                    (AppPage::Home, "Home"),
+                    (AppPage::Play, "Play"),
+                    (AppPage::Puzzles, "Puzzles"),
+                    (AppPage::Learn, "Learn"),
+                    (AppPage::Watch, "Watch"),
+                    (AppPage::Profile, "Profile"),
+                ] {
+                    if ui.selectable_label(self.page == page, label).clicked() {
+                        self.page = page;
+                    }
+                }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.label(&self.status);
+                    ui.label(RichText::new(&self.status).small().color(Color32::from_rgb(170, 190, 175)));
                 });
             });
             ui.add_space(5.0);
         });
+
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.vertical_centered(|ui| {
-                ui.horizontal(|ui| {
-                    if ui.selectable_label(self.engine_enabled, "PvA").clicked() && !self.engine_enabled {
-                        self.engine_enabled = true;
-                        self.restart();
-                    }
-                    if ui.selectable_label(!self.engine_enabled, "PvP").clicked() && self.engine_enabled {
-                        self.engine_enabled = false;
-                        self.restart();
-                    }
-                    if self.engine_enabled {
-                        ui.add(egui::Slider::new(&mut self.depth, 1..=6).text("AI strength"));
-                    }
-                    ui.label(match self.depth { 1 => "Beginner", 2 => "Easy", 3 => "Medium", 4 => "Hard", 5 => "Expert", _ => "Chess Engine" });
-                });
+            egui::ScrollArea::vertical().show(ui, |ui| {
                 ui.add_space(12.0);
-                self.draw_board(ui);
-                ui.add_space(10.0);
-                if let Some((_, _)) = self.promotion {
-                    ui.horizontal(|ui| {
-                        ui.label("Promote to");
-                        if ui.button("Queen").clicked() { self.choose_promotion(Piece::Queen); }
-                        if ui.button("Rook").clicked() { self.choose_promotion(Piece::Rook); }
-                        if ui.button("Bishop").clicked() { self.choose_promotion(Piece::Bishop); }
-                        if ui.button("Knight").clicked() { self.choose_promotion(Piece::Knight); }
-                    });
-                }
-                ui.horizontal(|ui| {
-                    if ui.button("Undo").clicked() { self.undo(); }
-                    if ui.button("New game").clicked() { self.restart(); }
-                });
-                ui.add_space(8.0);
-                egui::ScrollArea::horizontal().show(ui, |ui| {
-                    let history = if self.moves.is_empty() { "Move history".to_owned() } else { self.moves.join("   ") };
-                    ui.label(history);
-                });
-                egui::CollapsingHeader::new("Chat")
-                    .default_open(false)
-                    .show(ui, |ui| {
+                match self.page {
+                    AppPage::Home => {
+                        ui.heading("Play chess. Get better.");
+                        ui.label("Welcome to Chess Engine — your place to play, learn and improve.");
+                        ui.add_space(18.0);
+                        ui.columns(2, |columns| {
+                            columns[0].group(|ui| {
+                                ui.heading("Play online");
+                                ui.label("Challenge another player with live multiplayer.");
+                                ui.add_space(8.0);
+                                if ui.add_sized([ui.available_width(), 42.0], egui::Button::new("Play a friend")).clicked() {
+                                    self.engine_enabled = false;
+                                    self.page = AppPage::Play;
+                                    self.restart();
+                                }
+                            });
+                            columns[1].group(|ui| {
+                                ui.heading("Play vs Chess Engine");
+                                ui.label("Choose your difficulty and test your game.");
+                                ui.add_space(8.0);
+                                if ui.add_sized([ui.available_width(), 42.0], egui::Button::new("Play computer")).clicked() {
+                                    self.engine_enabled = true;
+                                    self.page = AppPage::Play;
+                                    self.restart();
+                                }
+                            });
+                        });
+                        ui.add_space(14.0);
+                        ui.heading("Explore");
+                        ui.columns(3, |columns| {
+                            for (column, title, description, page) in [
+                                (&mut columns[0], "Puzzles", "Sharpen your tactics.", AppPage::Puzzles),
+                                (&mut columns[1], "Learn", "Openings and chess basics.", AppPage::Learn),
+                                (&mut columns[2], "Watch", "Follow featured games.", AppPage::Watch),
+                            ] {
+                                column.group(|ui| {
+                                    ui.heading(title);
+                                    ui.label(description);
+                                    if ui.button("Explore").clicked() { self.page = page; }
+                                });
+                            }
+                        });
+                        ui.add_space(14.0);
+                        ui.group(|ui| {
+                            ui.heading("Your chess space");
+                            ui.label("Play online and against the engine from the same Chess Engine account experience.");
+                            ui.label("Ratings, saved games and player profiles will be added as account services are built.");
+                        });
+                    }
+                    AppPage::Play => {
                         ui.horizontal_wrapped(|ui| {
-                            ui.label("Server");
-                            ui.text_edit_singleline(&mut self.chat.url);
-                            if ui.button("Connect").clicked() {
-                                self.chat.connect();
+                            if ui.selectable_label(self.engine_enabled, "Play vs AI").clicked() && !self.engine_enabled {
+                                self.engine_enabled = true;
+                                self.restart();
+                            }
+                            if ui.selectable_label(!self.engine_enabled, "PvP").clicked() && self.engine_enabled {
+                                self.engine_enabled = false;
+                                self.restart();
+                            }
+                            if self.engine_enabled {
+                                ui.add(egui::Slider::new(&mut self.depth, 1..=6).text("AI strength"));
+                                ui.label(match self.depth { 1 => "Beginner", 2 => "Easy", 3 => "Medium", 4 => "Hard", 5 => "Expert", _ => "Chess Engine" });
                             }
                         });
-                        ui.horizontal(|ui| {
-                            ui.label("Name");
-                            ui.add(egui::TextEdit::singleline(&mut self.chat.name).desired_width(110.0));
-                            if ui.button("Create room").clicked() {
-                                self.chat.create_room();
-                            }
-                        });
-                        ui.horizontal(|ui| {
-                            ui.label("Room code");
-                            ui.add(egui::TextEdit::singleline(&mut self.chat.room_code).desired_width(100.0));
-                            if ui.button("Join").clicked() {
-                                self.chat.join_room();
-                            }
-                        });
-                        ui.horizontal(|ui| {
-                            if ui.selectable_label(self.chat.tab == ChatTab::Global, "Global").clicked() {
-                                self.chat.tab = ChatTab::Global;
-                            }
-                            if ui.selectable_label(self.chat.tab == ChatTab::Match, "Match").clicked() {
-                                self.chat.tab = ChatTab::Match;
-                            }
-                        });
-                        let active_scope = if self.chat.tab == ChatTab::Global { "global" } else { "match" };
-                        egui::ScrollArea::vertical().max_height(130.0).stick_to_bottom(true).show(ui, |ui| {
-                            let mut shown = false;
-                            for line in &self.chat.lines {
-                                if line.scope == active_scope {
-                                    shown = true;
-                                    ui.horizontal_wrapped(|ui| {
-                                        ui.strong(format!("{}:", line.name));
-                                        ui.label(&line.message);
+                        ui.add_space(10.0);
+                        ui.columns(2, |columns| {
+                            columns[0].vertical_centered(|ui| {
+                                self.draw_board(ui);
+                                if self.promotion.is_some() {
+                                    ui.horizontal(|ui| {
+                                        ui.label("Promote to");
+                                        if ui.button("Queen").clicked() { self.choose_promotion(Piece::Queen); }
+                                        if ui.button("Rook").clicked() { self.choose_promotion(Piece::Rook); }
+                                        if ui.button("Bishop").clicked() { self.choose_promotion(Piece::Bishop); }
+                                        if ui.button("Knight").clicked() { self.choose_promotion(Piece::Knight); }
                                     });
                                 }
-                            }
-                            if !shown {
-                                ui.weak(if active_scope == "global" { "No global messages yet" } else { "No match messages yet" });
-                            }
+                                ui.horizontal(|ui| {
+                                    if ui.button("Undo").clicked() { self.undo(); }
+                                    if ui.button("New game").clicked() { self.restart(); }
+                                });
+                            });
+                            columns[1].vertical(|ui| {
+                                ui.group(|ui| {
+                                    ui.heading("Game");
+                                    ui.label(&self.status);
+                                    ui.label(if self.engine_enabled { "You are playing the computer." } else if self.chat.room_code.is_empty() { "Local board or connect to an online room." } else { "Online room active." });
+                                    ui.separator();
+                                    ui.label("Move history");
+                                    egui::ScrollArea::vertical().max_height(150.0).show(ui, |ui| {
+                                        if self.moves.is_empty() { ui.weak("Moves will appear here."); }
+                                        for (index, mv) in self.moves.iter().enumerate() {
+                                            ui.label(format!("{}. {}", index + 1, mv));
+                                        }
+                                    });
+                                });
+                                egui::CollapsingHeader::new("Online game & chat").default_open(true).show(ui, |ui| {
+                                    ui.horizontal_wrapped(|ui| {
+                                        ui.label("Server");
+                                        ui.text_edit_singleline(&mut self.chat.url);
+                                        if ui.button("Connect").clicked() { self.chat.connect(); }
+                                    });
+                                    ui.horizontal(|ui| {
+                                        ui.label("Name");
+                                        ui.add(egui::TextEdit::singleline(&mut self.chat.name).desired_width(110.0));
+                                        if ui.button("Create room").clicked() { self.chat.create_room(); }
+                                    });
+                                    ui.horizontal(|ui| {
+                                        ui.label("Room");
+                                        ui.add(egui::TextEdit::singleline(&mut self.chat.room_code).desired_width(100.0));
+                                        if ui.button("Join").clicked() { self.chat.join_room(); }
+                                    });
+                                    ui.horizontal(|ui| {
+                                        if ui.selectable_label(self.chat.tab == ChatTab::Global, "Global").clicked() { self.chat.tab = ChatTab::Global; }
+                                        if ui.selectable_label(self.chat.tab == ChatTab::Match, "Match").clicked() { self.chat.tab = ChatTab::Match; }
+                                    });
+                                    let scope = if self.chat.tab == ChatTab::Global { "global" } else { "match" };
+                                    egui::ScrollArea::vertical().max_height(140.0).stick_to_bottom(true).show(ui, |ui| {
+                                        let mut shown = false;
+                                        for line in &self.chat.lines {
+                                            if line.scope == scope {
+                                                shown = true;
+                                                ui.horizontal_wrapped(|ui| {
+                                                    ui.strong(format!("{}:", line.name));
+                                                    ui.label(&line.message);
+                                                });
+                                            }
+                                        }
+                                        if !shown { ui.weak(if scope == "global" { "No global messages yet." } else { "No match messages yet." }); }
+                                    });
+                                    ui.horizontal(|ui| {
+                                        let response = ui.add(egui::TextEdit::singleline(&mut self.chat.input).hint_text("Write a message...").desired_width(ui.available_width() - 58.0));
+                                        let enter = response.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter));
+                                        if ui.button("Send").clicked() || enter { self.chat.send_chat(); }
+                                    });
+                                    ui.small(&self.chat.status);
+                                });
+                            });
                         });
-                        ui.horizontal(|ui| {
-                            let response = ui.add(
-                                egui::TextEdit::singleline(&mut self.chat.input)
-                                    .hint_text("Write a message...")
-                                    .desired_width(ui.available_width() - 58.0)
-                            );
-                            let enter = response.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter));
-                            if ui.button("Send").clicked() || enter {
-                                self.chat.send_chat();
-                            }
+                    }
+                    AppPage::Puzzles => {
+                        ui.heading("Chess puzzles");
+                        ui.label("Tactical training is coming next.");
+                        ui.group(|ui| {
+                            ui.heading("Puzzle modes planned");
+                            ui.label("• Find the best move");
+                            ui.label("• Checkmate in one, two and three");
+                            ui.label("• Daily puzzle streaks");
+                            ui.label("• Puzzle rating and progress");
                         });
-                        ui.small(&self.chat.status);
-                    });
+                        if ui.button("Back to play").clicked() { self.page = AppPage::Play; }
+                    }
+                    AppPage::Learn => {
+                        ui.heading("Learn chess");
+                        ui.label("Build your understanding one lesson at a time.");
+                        ui.group(|ui| {
+                            ui.heading("Learning library");
+                            ui.label("• How each piece moves");
+                            ui.label("• Opening principles");
+                            ui.label("• Tactics and checkmates");
+                            ui.label("• Endgame fundamentals");
+                        });
+                        ui.weak("Interactive lessons are coming soon.");
+                    }
+                    AppPage::Watch => {
+                        ui.heading("Watch chess");
+                        ui.label("A home for live games, featured matches and spectators.");
+                        ui.weak("Live game listings and spectator boards are coming soon.");
+                    }
+                    AppPage::Profile => {
+                        ui.heading("Player profile");
+                        ui.label(&self.chat.name);
+                        ui.group(|ui| {
+                            ui.heading("Your stats");
+                            ui.label(format!("Games played on this device: {}", self.history.len().saturating_sub(1)));
+                            ui.label("Online rating: not available yet");
+                            ui.label("Game archive: coming soon");
+                        });
+                    }
+                }
+                ui.add_space(24.0);
             });
         });
         ctx.request_repaint();
