@@ -1,6 +1,6 @@
 # Chess Engine multiplayer server
 
-Standalone Rust WebSocket server for Chess Engine global chat, match chat, and room-code multiplayer. It is separate from the Android and Windows app builds.
+Single Rust server for the Chess Engine browser app, global chat, match chat, and room-code multiplayer. Android and Windows builds connect to this same server.
 
 ## Run
 
@@ -9,7 +9,7 @@ cd server
 cargo run --release
 ```
 
-The server listens on `0.0.0.0:8080` by default. Set `BIND_ADDR` to override it. Deploy behind a TLS reverse proxy and connect clients using `wss://`.
+The server listens on `0.0.0.0:8080` by default. Set `BIND_ADDR` to override it. The release binary embeds the Rust WebAssembly browser app, so the same process serves the website and multiplayer API. Deploy behind Wispbyte's HTTPS/WSS proxy.
 
 - Health: `GET /health`
 - WebSocket: `/ws`
@@ -33,4 +33,4 @@ Global messages are broadcast to every connected client. Match messages are sent
 
 ## Current scope
 
-The shared Rust app now includes a WebSocket chat panel with Global and Match tabs, a server-address field, display name, and room create/join controls. The app does not ship with a hosted server address: deploy this server and enter its WebSocket URL ending in `/ws` in the app. Match chat requires creating or joining a room. Rooms are held in memory and are lost when the server restarts. Use a persistent store and add reconnection/authentication/rate limits before running a public production service.
+The native and browser apps use the same Rust chess UI. The server build workflow first compiles the browser app to WebAssembly, generates its loader, and embeds both files into the Linux server binary. Upload that one binary to Wispbyte; it serves the website at `/` and multiplayer at `/ws`. Client WebSocket URL: `wss://chessengine.wispbyte.app/ws`. Match chat requires creating or joining a room. Rooms are held in memory and are lost when the server restarts. Use a persistent store and add reconnection/authentication/rate limits before running a public production service.
