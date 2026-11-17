@@ -465,6 +465,7 @@ mod tests {
     }
 }
 
+mod audio;
 mod app;
 mod chat;
 pub use app::ChessApp;
