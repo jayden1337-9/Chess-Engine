@@ -118,13 +118,28 @@ impl ChessApp {
             && mv.get_source().get_file().to_index().abs_diff(mv.get_dest().get_file().to_index()) > 1;
         let next = before.make_move_new(mv);
 
+        let animation_start = Instant::now();
         self.animations.push(PieceAnimation {
             from: mv.get_source(),
             to: mv.get_dest(),
             piece: Self::code(moving_piece, moving_color),
-            started: Instant::now(),
+            started: animation_start,
             duration: 0.38,
         });
+        if castle {
+            let rank = mv.get_source().to_string().chars().nth(1).unwrap_or('1');
+            let kingside = mv.get_dest().get_file().to_index() > mv.get_source().get_file().to_index();
+            let (rook_from, rook_to) = if kingside { (format!("h{rank}"), format!("f{rank}")) } else { (format!("a{rank}"), format!("d{rank}")) };
+            if let (Ok(from), Ok(to)) = (Square::from_str(&rook_from), Square::from_str(&rook_to)) {
+                self.animations.push(PieceAnimation {
+                    from,
+                    to,
+                    piece: Self::code(Piece::Rook, moving_color),
+                    started: animation_start,
+                    duration: 0.38,
+                });
+            }
+        }
         self.board = next;
         self.history.push(self.board);
         self.moves.push(uci_move(mv));
@@ -157,7 +172,7 @@ impl ChessApp {
     }
 
     fn tap_square(&mut self, square: Square) {
-        if self.promotion.is_some() || self.board.status() != BoardStatus::Ongoing {
+        if self.promotion.is_some() || self.pending_engine.is_some() || self.board.status() != BoardStatus::Ongoing {
             return;
         }
         if let Some(from) = self.selected {
@@ -289,7 +304,6 @@ impl ChessApp {
                 );
             }
         }
-        let now = Instant::now();
         self.animations.retain(|animation| animation.started.elapsed().as_secs_f32() < animation.duration);
         for animation in &self.animations {
             let progress = (animation.started.elapsed().as_secs_f32() / animation.duration).clamp(0.0, 1.0);
