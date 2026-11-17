@@ -16,7 +16,7 @@ eframe = { version = "0.31.1", default-features = false, features = ["default_fo
 image = { version = "0.25", default-features = false, features = ["png"] }
 log = "0.4"
 
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+[target.'cfg(not(any(target_arch = "wasm32", target_os = "android")))'.dependencies]
 rodio = { version = "0.20.1", default-features = false }
 ewebsock = { version = "0.8", features = ["tls"] }
 serde_json = "1"
