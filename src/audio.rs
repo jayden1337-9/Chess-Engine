@@ -1,3 +1,4 @@
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 use std::time::Duration;
 
 #[derive(Clone, Copy)]
@@ -40,7 +41,7 @@ pub struct Audio {
     enabled: bool,
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 impl Audio {
     pub fn new() -> Self {
         match rodio::OutputStream::try_default() {
