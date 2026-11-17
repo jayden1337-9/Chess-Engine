@@ -69,7 +69,7 @@ impl Audio {
     }
 }
 
-#[cfg(any(target_arch = "wasm32", target_os = "android"))]
+#[cfg(target_arch = "wasm32")]
 pub struct Audio {
     context: Option<web_sys::AudioContext>,
     enabled: bool,
@@ -105,5 +105,25 @@ impl Audio {
             let _ = oscillator.stop_with_when(end);
             offset += *millis as f64 / 1000.0 + 0.018;
         }
+    }
+}
+
+#[cfg(target_os = "android")]
+pub struct Audio {
+    enabled: bool,
+}
+
+#[cfg(target_os = "android")]
+impl Audio {
+    pub fn new() -> Self {
+        Self { enabled: true }
+    }
+
+    pub fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
+    }
+
+    pub fn play(&self, _sound: Sound) {
+        // Android audio is intentionally disabled until a platform-native backend is added.
     }
 }
