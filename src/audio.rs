@@ -33,7 +33,7 @@ fn notes(sound: Sound) -> &'static [(f32, u64)] {
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 pub struct Audio {
     _stream: Option<rodio::OutputStream>,
     handle: Option<rodio::OutputStreamHandle>,
@@ -69,7 +69,7 @@ impl Audio {
     }
 }
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(any(target_arch = "wasm32", target_os = "android"))]
 pub struct Audio {
     context: Option<web_sys::AudioContext>,
     enabled: bool,
