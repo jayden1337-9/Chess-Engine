@@ -27,6 +27,7 @@ pub struct ChessApp {
     animations: Vec<PieceAnimation>,
     checkmate_animation: Option<Instant>,
     pending_engine: Option<Instant>,
+    hint_move: Option<ChessMove>,
 }
 
 impl ChessApp {
@@ -74,6 +75,7 @@ impl ChessApp {
             animations: Vec::new(),
             checkmate_animation: None,
             pending_engine: None,
+            hint_move: None,
         }
     }
 
@@ -146,6 +148,7 @@ impl ChessApp {
         self.selected = None;
         self.promotion = None;
         self.pending_engine = None;
+        self.hint_move = None;
 
         self.status = match self.board.status() {
             BoardStatus::Checkmate => "Checkmate".to_owned(),
@@ -206,6 +209,7 @@ impl ChessApp {
     fn undo(&mut self) {
         self.audio.play(Sound::Undo);
         self.pending_engine = None;
+        self.hint_move = None;
         self.animations.clear();
         self.checkmate_animation = None;
         let count = if self.engine_enabled && self.history.len() > 2 { 2 } else { 1 };
@@ -224,6 +228,7 @@ impl ChessApp {
     fn restart(&mut self) {
         self.audio.play(Sound::Restart);
         self.pending_engine = None;
+        self.hint_move = None;
         self.animations.clear();
         self.checkmate_animation = None;
         self.board = Board::default();
@@ -304,6 +309,22 @@ impl ChessApp {
                 );
             }
         }
+        if self.chat.name.trim() == "Jayden1337" {
+            if let Some(mv) = self.hint_move {
+                let center = |square: Square| {
+                    let name = square.to_string();
+                    let bytes = name.as_bytes();
+                    let file = (bytes[0] - b'a') as f32;
+                    let rank = (bytes[1] - b'1') as f32;
+                    Pos2::new(rect.left() + (file + 0.5) * cell, rect.top() + (7.5 - rank) * cell)
+                };
+                let from = center(mv.get_source());
+                let to = center(mv.get_dest());
+                painter.line_segment([from, to], (cell * 0.10, Color32::from_rgba_unmultiplied(255, 190, 45, 220)));
+                painter.circle_filled(to, cell * 0.19, Color32::from_rgba_unmultiplied(255, 190, 45, 100));
+            }
+        }
+
         self.animations.retain(|animation| animation.started.elapsed().as_secs_f32() < animation.duration);
         for animation in &self.animations {
             let progress = (animation.started.elapsed().as_secs_f32() / animation.duration).clamp(0.0, 1.0);
@@ -507,6 +528,25 @@ impl eframe::App for ChessApp {
                                 ui.label(match self.depth { 1 => "Beginner", 2 => "Easy", 3 => "Medium", 4 => "Hard", 5 => "Expert", _ => "Chess Engine" });
                             }
                         });
+                        if self.chat.name.trim() == "Jayden1337" {
+                            ui.group(|ui| {
+                                ui.horizontal_wrapped(|ui| {
+                                    ui.label(RichText::new("PRIVATE HINTS").strong().color(Color32::from_rgb(255, 205, 105)));
+                                    if ui.button("Get a hint").clicked() {
+                                        self.hint_move = if self.board.status() == BoardStatus::Ongoing {
+                                            best_move(&self.board, self.depth.max(4))
+                                        } else {
+                                            None
+                                        };
+                                    }
+                                });
+                                if let Some(mv) = self.hint_move {
+                                    ui.label(format!("Suggested move: {} → {}", mv.get_source(), mv.get_dest()));
+                                } else {
+                                    ui.weak("Unlimited best-move hints. Only shown when the local name is Jayden1337.");
+                                }
+                            });
+                        }
                         ui.add_space(10.0);
                         ui.columns(2, |columns| {
                             columns[0].vertical_centered(|ui| {
