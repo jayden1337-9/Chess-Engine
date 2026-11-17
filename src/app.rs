@@ -2,10 +2,13 @@ use crate::{best_move, uci_move};
 use crate::chat::{ChatClient, ChatTab};
 use chess::{Board, BoardStatus, ChessMove, Color, MoveGen, Piece, Square};
 use eframe::egui::{self, Color32, Pos2, Rect, RichText, Sense, TextureHandle, Vec2};
-use std::{collections::HashMap, str::FromStr};
+use std::{collections::HashMap, str::FromStr, time::{Duration, Instant}};
+use crate::audio::{Audio, Sound};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum AppPage { Home, Play, Puzzles, Learn, Watch, Profile }
+
+struct PieceAnimation { from: Square, to: Square, piece: char, started: Instant, duration: f32 }
 
 pub struct ChessApp {
     page: AppPage,
@@ -19,6 +22,11 @@ pub struct ChessApp {
     depth: u8,
     status: String,
     chat: ChatClient,
+    audio: Audio,
+    sound_enabled: bool,
+    animations: Vec<PieceAnimation>,
+    checkmate_animation: Option<Instant>,
+    pending_engine: Option<Instant>,
 }
 
 impl ChessApp {
@@ -61,6 +69,11 @@ impl ChessApp {
             depth: 3,
             status: "Your move".to_owned(),
             chat: ChatClient::default(),
+            audio: Audio::new(),
+            sound_enabled: true,
+            animations: Vec::new(),
+            checkmate_animation: None,
+            pending_engine: None,
         }
     }
 
@@ -85,11 +98,40 @@ impl ChessApp {
             if self.chat.player_color != Some(self.board.side_to_move()) { return; }
             self.chat.send_move(&uci_move(mv));
         }
-        self.board = self.board.make_move_new(mv);
+        self.apply_move(mv);
+        if self.engine_enabled && self.board.status() == BoardStatus::Ongoing && self.board.side_to_move() == Color::Black {
+            self.status = "Chess Engine is thinking...".to_owned();
+            self.pending_engine = Some(Instant::now() + Duration::from_millis(420));
+        }
+    }
+
+    fn apply_move(&mut self, mv: ChessMove) {
+        let before = self.board;
+        let moving_piece = before.piece_on(mv.get_source()).unwrap_or(Piece::Pawn);
+        let moving_color = before.color_on(mv.get_source()).unwrap_or(before.side_to_move());
+        let destination_piece = before.piece_on(mv.get_dest());
+        let en_passant = moving_piece == Piece::Pawn
+            && mv.get_source().get_file() != mv.get_dest().get_file()
+            && destination_piece.is_none();
+        let capture = destination_piece.is_some() || en_passant;
+        let castle = moving_piece == Piece::King
+            && mv.get_source().get_file().to_index().abs_diff(mv.get_dest().get_file().to_index()) > 1;
+        let next = before.make_move_new(mv);
+
+        self.animations.push(PieceAnimation {
+            from: mv.get_source(),
+            to: mv.get_dest(),
+            piece: Self::code(moving_piece, moving_color),
+            started: Instant::now(),
+            duration: 0.38,
+        });
+        self.board = next;
         self.history.push(self.board);
         self.moves.push(uci_move(mv));
         self.selected = None;
         self.promotion = None;
+        self.pending_engine = None;
+
         self.status = match self.board.status() {
             BoardStatus::Checkmate => "Checkmate".to_owned(),
             BoardStatus::Stalemate => "Draw by stalemate".to_owned(),
@@ -98,20 +140,20 @@ impl ChessApp {
             BoardStatus::Ongoing if self.board.side_to_move() == Color::White => "White to move".to_owned(),
             BoardStatus::Ongoing => "Black to move".to_owned(),
         };
-        if self.engine_enabled && self.board.status() == BoardStatus::Ongoing && self.board.side_to_move() == Color::Black {
-            self.status = "Chess Engine is thinking...".to_owned();
-            if let Some(reply) = best_move(&self.board, self.depth) {
-                self.board = self.board.make_move_new(reply);
-                self.history.push(self.board);
-                self.moves.push(uci_move(reply));
+
+        let sound = match self.board.status() {
+            BoardStatus::Checkmate => {
+                self.checkmate_animation = Some(Instant::now());
+                Sound::Checkmate
             }
-            self.status = match self.board.status() {
-                BoardStatus::Checkmate => "Checkmate".to_owned(),
-                BoardStatus::Stalemate => "Draw by stalemate".to_owned(),
-                BoardStatus::Ongoing if self.board.checkers().popcnt() > 0 => "Check".to_owned(),
-                BoardStatus::Ongoing => "Your move".to_owned(),
-            };
-        }
+            BoardStatus::Stalemate => Sound::Draw,
+            BoardStatus::Ongoing if self.board.checkers().popcnt() > 0 => Sound::Check,
+            BoardStatus::Ongoing if castle => Sound::Castle,
+            BoardStatus::Ongoing if mv.get_promotion().is_some() => Sound::Promotion,
+            BoardStatus::Ongoing if capture => Sound::Capture,
+            BoardStatus::Ongoing => Sound::Move,
+        };
+        self.audio.play(sound);
     }
 
     fn tap_square(&mut self, square: Square) {
@@ -134,6 +176,7 @@ impl ChessApp {
         let selectable = if self.engine_enabled { Color::White } else { self.chat.player_color.unwrap_or_else(|| self.board.side_to_move()) };
         if self.board.color_on(square) == Some(selectable) {
             self.selected = Some(square);
+            self.audio.play(Sound::Select);
         } else {
             self.selected = None;
         }
@@ -146,6 +189,10 @@ impl ChessApp {
     }
 
     fn undo(&mut self) {
+        self.audio.play(Sound::Undo);
+        self.pending_engine = None;
+        self.animations.clear();
+        self.checkmate_animation = None;
         let count = if self.engine_enabled && self.history.len() > 2 { 2 } else { 1 };
         for _ in 0..count {
             if self.history.len() > 1 {
@@ -160,6 +207,10 @@ impl ChessApp {
     }
 
     fn restart(&mut self) {
+        self.audio.play(Sound::Restart);
+        self.pending_engine = None;
+        self.animations.clear();
+        self.checkmate_animation = None;
         self.board = Board::default();
         self.history = vec![self.board];
         self.moves.clear();
@@ -217,12 +268,15 @@ impl ChessApp {
                 } else if self.selected.is_some() && legal.iter().any(|mv| mv.get_source() == self.selected.unwrap() && mv.get_dest() == square) {
                     painter.circle_filled(cell_rect.center(), cell * 0.12, Color32::from_rgba_unmultiplied(20, 30, 25, 105));
                 }
-                if let (Some(piece), Some(color)) = (self.board.piece_on(square), self.board.color_on(square)) {
-                    let key = Self::code(piece, color);
-                    if let Some(texture) = self.textures.get(&key) {
-                        let padding = cell * 0.07;
-                        let piece_rect = cell_rect.shrink(padding);
-                        painter.image(texture.id(), piece_rect, Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)), Color32::WHITE);
+                let piece_is_animating = self.animations.iter().any(|animation| animation.to == square);
+                if !piece_is_animating {
+                    if let (Some(piece), Some(color)) = (self.board.piece_on(square), self.board.color_on(square)) {
+                        let key = Self::code(piece, color);
+                        if let Some(texture) = self.textures.get(&key) {
+                            let padding = cell * 0.07;
+                            let piece_rect = cell_rect.shrink(padding);
+                            painter.image(texture.id(), piece_rect, Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)), Color32::WHITE);
+                        }
                     }
                 }
                 let coordinate = format!("{}{}", (b'a' + col as u8) as char, 8 - row);
@@ -235,6 +289,65 @@ impl ChessApp {
                 );
             }
         }
+        let now = Instant::now();
+        self.animations.retain(|animation| animation.started.elapsed().as_secs_f32() < animation.duration);
+        for animation in &self.animations {
+            let progress = (animation.started.elapsed().as_secs_f32() / animation.duration).clamp(0.0, 1.0);
+            let eased = 1.0 - (1.0 - progress).powi(3);
+            let square_center = |square: Square| {
+                let name = square.to_string();
+                let bytes = name.as_bytes();
+                let file = (bytes[0] - b'a') as f32;
+                let rank = (bytes[1] - b'1') as f32;
+                Pos2::new(rect.left() + (file + 0.5) * cell, rect.top() + (7.5 - rank) * cell)
+            };
+            let from = square_center(animation.from);
+            let to = square_center(animation.to);
+            let arc = (progress * std::f32::consts::PI).sin() * cell * 0.16;
+            let bounce = if progress > 0.82 {
+                (((progress - 0.82) / 0.18) * std::f32::consts::PI).sin() * cell * 0.025
+            } else { 0.0 };
+            let center = Pos2::new(
+                from.x + (to.x - from.x) * eased,
+                from.y + (to.y - from.y) * eased - arc + bounce,
+            );
+            painter.circle_filled(
+                center + Vec2::new(0.0, cell * 0.31),
+                cell * (0.29 - progress * 0.07),
+                Color32::from_black_alpha(55),
+            );
+            if let Some(texture) = self.textures.get(&animation.piece) {
+                let piece_rect = Rect::from_center_size(center, Vec2::splat(cell * 0.86));
+                painter.image(texture.id(), piece_rect, Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)), Color32::WHITE);
+            }
+        }
+
+        if let Some(started) = self.checkmate_animation {
+            let elapsed = started.elapsed().as_secs_f32();
+            if elapsed < 2.8 {
+                let pulse = (elapsed * 5.5).sin().abs();
+                painter.rect_filled(rect, 0.0, Color32::from_black_alpha(105));
+                let alpha = (175.0 + pulse * 80.0) as u8;
+                painter.text(
+                    rect.center() - Vec2::new(0.0, cell * 0.12),
+                    egui::Align2::CENTER_CENTER,
+                    "CHECKMATE",
+                    egui::FontId::proportional((cell * 0.66).max(24.0)),
+                    Color32::from_rgba_unmultiplied(255, 215, 105, alpha),
+                );
+                painter.text(
+                    rect.center() + Vec2::new(0.0, cell * 0.55),
+                    egui::Align2::CENTER_CENTER,
+                    "GAME OVER",
+                    egui::FontId::proportional((cell * 0.19).max(11.0)),
+                    Color32::WHITE,
+                );
+                ui.ctx().request_repaint();
+            } else {
+                self.checkmate_animation = None;
+            }
+        }
+
         if response.clicked() {
             if let Some(pos) = response.interact_pointer_pos() {
                 let col = ((pos.x - rect.left()) / cell) as usize;
@@ -252,14 +365,29 @@ impl ChessApp {
 
 impl eframe::App for ChessApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        self.audio.set_enabled(self.sound_enabled);
         self.chat.poll();
+
+        if self.pending_engine.is_some_and(|when| Instant::now() >= when) {
+            self.pending_engine = None;
+            if self.board.status() == BoardStatus::Ongoing && self.board.side_to_move() == Color::Black {
+                if let Some(reply) = best_move(&self.board, self.depth) {
+                    self.apply_move(reply);
+                }
+            }
+        }
         for (uci, fen) in self.chat.take_remote_moves() {
             if let Ok(board) = Board::from_str(&fen) {
-                self.board = board;
-                self.history.push(board);
-                self.moves.push(uci);
-                self.selected = None;
-                self.promotion = None;
+                if let Some(mv) = crate::parse_uci_move(&self.board, &uci) {
+                    self.apply_move(mv);
+                    self.board = board;
+                } else {
+                    self.board = board;
+                    self.history.push(board);
+                    self.moves.push(uci);
+                    self.selected = None;
+                    self.promotion = None;
+                }
                 self.status = match board.status() {
                     BoardStatus::Checkmate => "Checkmate".to_owned(),
                     BoardStatus::Stalemate => "Draw by stalemate".to_owned(),
@@ -359,6 +487,7 @@ impl eframe::App for ChessApp {
                                 self.engine_enabled = false;
                                 self.restart();
                             }
+                            ui.checkbox(&mut self.sound_enabled, "Sound effects");
                             if self.engine_enabled {
                                 ui.add(egui::Slider::new(&mut self.depth, 1..=6).text("AI strength"));
                                 ui.label(match self.depth { 1 => "Beginner", 2 => "Easy", 3 => "Medium", 4 => "Hard", 5 => "Expert", _ => "Chess Engine" });
